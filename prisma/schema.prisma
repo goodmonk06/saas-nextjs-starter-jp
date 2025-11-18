@@ -25,11 +25,28 @@ model User {
   stripePriceId          String?
   stripeCurrentPeriodEnd DateTime?
 
-  accounts      Account[]
-  sessions      Session[]
+  // Enhanced fields
+  bio              String?
+  preferences      Json?              @default("{}")
+  metadata         Json?              @default("{}")
+  lastLoginAt      DateTime?
+  deletedAt        DateTime?          // Soft delete
+
+  // Relationships
+  accounts              Account[]
+  sessions              Session[]
+  organizationMembers   OrganizationMember[]
+  createdOrganizations  Organization[]       @relation("OrganizationCreator")
+  invitations           Invitation[]         @relation("InvitationInviter")
+  receivedInvitations   Invitation[]         @relation("InvitationInvitee")
+  auditLogs             AuditLog[]
+  apiKeys               ApiKey[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([email])
+  @@index([deletedAt])
 }
 
 model Account {
@@ -49,6 +66,7 @@ model Account {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
+  @@index([userId])
 }
 
 model Session {
@@ -57,6 +75,8 @@ model Session {
   userId       String
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model VerificationToken {
@@ -67,7 +87,169 @@ model VerificationToken {
   @@unique([identifier, token])
 }
 
+model Organization {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  logo        String?
+  plan        Plan     @default(FREE)
+
+  // Stripe for organization-level billing
+  stripeCustomerId       String?   @unique
+  stripeSubscriptionId   String?   @unique
+  stripePriceId          String?
+  stripeCurrentPeriodEnd DateTime?
+
+  // Settings and metadata
+  settings    Json?     @default("{}")
+  metadata    Json?     @default("{}")
+
+  // Ownership
+  createdBy   String
+  creator     User      @relation("OrganizationCreator", fields: [createdBy], references: [id])
+
+  // Soft delete
+  deletedAt   DateTime?
+
+  // Relationships
+  members     OrganizationMember[]
+  invitations Invitation[]
+  auditLogs   AuditLog[]
+  apiKeys     ApiKey[]
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([slug])
+  @@index([createdBy])
+  @@index([deletedAt])
+}
+
+model OrganizationMember {
+  id             String         @id @default(cuid())
+  organizationId String
+  userId         String
+  role           MemberRole     @default(MEMBER)
+
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@unique([organizationId, userId])
+  @@index([organizationId])
+  @@index([userId])
+}
+
+model Invitation {
+  id             String           @id @default(cuid())
+  email          String
+  organizationId String
+  role           MemberRole       @default(MEMBER)
+  token          String           @unique
+  status         InvitationStatus @default(PENDING)
+
+  // Who invited
+  invitedBy      String
+  inviter        User             @relation("InvitationInviter", fields: [invitedBy], references: [id])
+
+  // If user exists
+  inviteeId      String?
+  invitee        User?            @relation("InvitationInvitee", fields: [inviteeId], references: [id])
+
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@index([email])
+  @@index([organizationId])
+  @@index([token])
+  @@index([status])
+}
+
+model AuditLog {
+  id             String       @id @default(cuid())
+  action         String       // e.g., "user.created", "organization.member.added"
+  entityType     String       // e.g., "User", "Organization"
+  entityId       String
+
+  // Actor
+  userId         String?
+  user           User?        @relation(fields: [userId], references: [id])
+
+  // Organization context
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+
+  // Event data
+  metadata       Json?        @default("{}")
+  ipAddress      String?
+  userAgent      String?
+
+  createdAt      DateTime     @default(now())
+
+  @@index([userId])
+  @@index([organizationId])
+  @@index([entityType, entityId])
+  @@index([action])
+  @@index([createdAt])
+}
+
+model ApiKey {
+  id             String       @id @default(cuid())
+  name           String
+  key            String       @unique  // Hashed API key
+  prefix         String       // First 8 chars for identification
+
+  // Owner
+  userId         String?
+  user           User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Organization
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Permissions
+  scopes         Json?        @default("[]")  // Array of permission scopes
+
+  // Usage tracking
+  lastUsedAt     DateTime?
+  expiresAt      DateTime?
+
+  // Soft delete / revoke
+  revokedAt      DateTime?
+
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([key])
+  @@index([userId])
+  @@index([organizationId])
+  @@index([revokedAt])
+}
+
+// Enums
 enum Plan {
   FREE
   PRO
+  ENTERPRISE
+}
+
+enum MemberRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
 }
