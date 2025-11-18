@@ -1,16 +1,20 @@
 # SaaS Starter JP
 
-日本向けSaaSの汎用スターター。認証・課金・ユーザー管理・管理画面までを含む、本番環境に近い実装を提供します。
+日本向けSaaSの汎用スターター。認証・課金・ユーザー管理・組織管理・監査ログまでを含む、エンタープライズグレードの実装を提供します。
 
 ## Overview（概要）
 
 このプロジェクトは、日本市場向けのSaaSアプリケーションを素早く立ち上げるための完全なスターターテンプレートです。
 
-**Phase 2 ステータス:**
-- ✅ エンドツーエンドで動作する垂直スライス実装済み
-- ✅ ローカル開発環境整備済み（Docker対応）
-- ✅ テスト環境構築済み
-- ✅ Seedデータ準備済み
+**Phase 3 ステータス:**
+- ✅ 複数の完全な垂直スライス実装済み（Organization管理、API Key管理）
+- ✅ マルチテナント（組織）機能完備
+- ✅ ロールベースアクセス制御（RBAC）
+- ✅ 包括的なテストスイート
+- ✅ 拡張可能なアーキテクチャ（アダプター、イベント、ロギング）
+- ✅ リッチなシードデータ（5ユーザー、3組織、招待、APIキー等）
+- ✅ 監査ログとセキュリティトラッキング
+- ✅ Docker環境完備
 
 ## Tech Stack（技術スタック）
 
@@ -41,19 +45,55 @@
 #### User（ユーザー）
 - ユーザーアカウント情報
 - 認証情報（email/password）
-- プラン情報（FREE/PRO）
+- プラン情報（FREE/PRO/ENTERPRISE）
 - Stripe顧客情報
+- プロフィール（bio、preferences、metadata）
+- ソフト削除対応（deletedAt）
 
 **リレーション:**
 - `accounts` (1:N) - OAuth アカウント連携用
 - `sessions` (1:N) - セッション管理用
+- `organizationMembers` (1:N) - 組織メンバーシップ
+- `createdOrganizations` (1:N) - 作成した組織
+- `invitations` (1:N) - 送信した招待
+- `apiKeys` (1:N) - APIキー
+- `auditLogs` (1:N) - 監査ログ
 
-#### Subscription（サブスクリプション）
-Userモデルに統合されています:
-- `plan`: FREE | PRO
-- `stripeCustomerId`: Stripe顧客ID
-- `stripeSubscriptionId`: サブスクリプションID
-- `stripeCurrentPeriodEnd`: 課金期間終了日
+#### Organization（組織）
+- 組織情報（name, slug, description）
+- プラン（FREE/PRO/ENTERPRISE）
+- Stripe連携
+- カスタマイズ可能な設定（settings）
+- ソフト削除対応
+
+**リレーション:**
+- `members` (1:N) - 組織メンバー
+- `invitations` (1:N) - 招待
+- `apiKeys` (1:N) - 組織APIキー
+- `auditLogs` (1:N) - 監査ログ
+
+#### OrganizationMember（組織メンバー）
+- ロールベースアクセス制御（OWNER/ADMIN/MEMBER）
+- ユーザーと組織の多対多関係を管理
+
+#### Invitation（招待）
+- メールベースの招待システム
+- ステータス管理（PENDING/ACCEPTED/EXPIRED/REVOKED）
+- セキュアなトークン生成
+- 有効期限管理
+
+#### ApiKey（APIキー）
+- プログラマティックアクセス用
+- セキュアなキー管理（SHA-256ハッシュ化）
+- スコープベースの権限管理
+- 使用状況トラッキング
+- 有効期限と失効管理
+
+#### AuditLog（監査ログ）
+- すべてのアクション追跡
+- ユーザー/組織レベルの記録
+- IPアドレス、UserAgent記録
+- メタデータ保存
 
 ## Getting Started（セットアップ）
 
@@ -136,63 +176,90 @@ docker compose up --build
 
 アプリケーションは http://localhost:3000 で起動します。
 
-## Example Flow（実装された垂直スライス）
+## Example Flows（実装された垂直スライス）
 
-### User Profile Management（ユーザープロフィール管理）
+### 1. User Profile Management（ユーザープロフィール管理）
 
 完全に動作するエンドツーエンドの機能実装例：
 
-#### 1. ユーザー登録
+#### ユーザー登録とプロフィール管理
 1. http://localhost:3000/auth/signup にアクセス
 2. 名前、メール、パスワードを入力
 3. アカウント作成後、自動的にダッシュボードへリダイレクト
+4. http://localhost:3000/settings でプロフィール編集
 
-#### 2. プロフィール取得
+### 2. Organization Management（組織管理）
+
+マルチテナント機能の完全実装：
+
+#### 組織の作成
+1. http://localhost:3000/organizations にアクセス
+2. 「新規作成」ボタンをクリック
+3. 組織名、スラッグ、説明を入力
+4. 作成者は自動的にOWNERロールで登録
+
+#### メンバー招待
+1. 組織詳細ページで「メンバーを招待」をクリック
+2. メールアドレスとロール（MEMBER/ADMIN/OWNER）を選択
+3. 招待メールが送信される（開発環境ではログに表示）
+4. 招待を受けたユーザーは招待を承諾して組織に参加
+
+#### ロールベースアクセス制御
+- **OWNER**: 組織の削除、全ての管理操作
+- **ADMIN**: メンバー管理、招待送信、組織設定変更
+- **MEMBER**: 組織の閲覧のみ
+
+### 3. API Key Management（APIキー管理）
+
+プログラマティックアクセスの実装：
+
+#### APIキーの作成
+1. http://localhost:3000/settings/api-keys にアクセス
+2. 「新規作成」ボタンをクリック
+3. キー名を入力
+4. 生成されたキーを安全に保存（一度だけ表示）
+
+#### APIキーの使用
 ```bash
-# API経由でプロフィール取得
-curl -X GET http://localhost:3000/api/users/me \
-  -H "Cookie: next-auth.session-token=YOUR_SESSION"
-```
-
-レスポンス例:
-```json
-{
-  "success": true,
-  "data": {
-    "id": "clxxx...",
-    "name": "テストユーザー",
-    "email": "test@example.com",
-    "plan": "FREE",
-    "createdAt": "2025-01-01T00:00:00.000Z",
-    "updatedAt": "2025-01-01T00:00:00.000Z"
-  }
-}
-```
-
-#### 3. プロフィール更新
-1. http://localhost:3000/settings にアクセス
-2. 名前やメールアドレスを変更
-3. 「変更を保存」ボタンをクリック
-4. リアルタイムでUIとセッションが更新される
-
-または API 経由:
-```bash
-curl -X PATCH http://localhost:3000/api/users/me \
-  -H "Content-Type: application/json" \
-  -H "Cookie: next-auth.session-token=YOUR_SESSION" \
-  -d '{"name": "新しい名前"}'
+# APIキーでの認証（実装例）
+curl -X GET http://localhost:3000/api/protected-endpoint \
+  -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
 ### デモアカウント
 
-Seedスクリプトにより、以下のデモアカウントが作成されます:
+Seedスクリプトにより、以下のリッチなデモデータが作成されます:
 
-| Email | Password | Plan |
-|-------|----------|------|
-| demo-free@example.com | demo1234 | FREE |
-| demo-pro@example.com | demo1234 | PRO |
+#### ユーザーアカウント（全てのパスワード: demo1234）
 
-これらのアカウントでログインして、すぐに機能を試すことができます。
+| Email | Name | Plan | 所属組織 | ロール |
+|-------|------|------|---------|--------|
+| alice@example.com | Alice Johnson | FREE | Creative Design Agency | OWNER |
+| alice@example.com | | | Tech Startup Inc. | ADMIN |
+| bob@example.com | Bob Smith | PRO | Tech Startup Inc. | OWNER |
+| bob@example.com | | | Enterprise Solutions Corp | ADMIN |
+| carol@example.com | Carol Williams | PRO | Tech Startup Inc. | MEMBER |
+| david@example.com | David Brown | FREE | Creative Design Agency | MEMBER |
+| emma@example.com | Emma Davis | ENTERPRISE | Enterprise Solutions Corp | OWNER |
+
+#### 組織
+
+| 組織名 | スラッグ | プラン | メンバー数 |
+|-------|---------|--------|-----------|
+| Tech Startup Inc. | tech-startup | PRO | 3 |
+| Creative Design Agency | creative-design | FREE | 2 |
+| Enterprise Solutions Corp | enterprise-solutions | ENTERPRISE | 2 |
+
+#### その他のデータ
+- **招待**: 2件（保留中）+ 1件（期限切れ）
+- **APIキー**: 3件（2件アクティブ、1件失効済み）
+- **監査ログ**: 6件（様々なアクション記録）
+
+**推奨シナリオ:**
+1. bob@example.com でログインして Tech Startup を管理
+2. alice@example.com でログインして複数組織のワークフローを体験
+3. APIキーを作成してプログラマティックアクセスをテスト
+4. 監査ログでセキュリティトラッキングを確認
 
 ## Available Scripts（利用可能なコマンド）
 
@@ -226,6 +293,31 @@ npm run db:reset     # DBをリセット（全データ削除）
 - `GET /api/users/me` - 現在のユーザー情報取得
 - `PATCH /api/users/me` - ユーザー情報更新
 
+### Organization Management
+- `GET /api/organizations` - ユーザーの組織一覧取得
+- `POST /api/organizations` - 新規組織作成
+- `GET /api/organizations/:id` - 組織詳細取得
+- `PATCH /api/organizations/:id` - 組織情報更新
+- `DELETE /api/organizations/:id` - 組織削除（ソフトデリート）
+
+### Member Management
+- `GET /api/organizations/:id/members` - メンバー一覧取得
+- `POST /api/organizations/:id/members` - メンバー追加
+- `PATCH /api/organizations/:id/members/:userId` - メンバーロール更新
+- `DELETE /api/organizations/:id/members/:userId` - メンバー削除
+
+### Invitation Management
+- `GET /api/organizations/:id/invitations` - 組織の招待一覧
+- `POST /api/organizations/:id/invitations` - 新規招待送信
+- `GET /api/invitations/me` - 自分宛の招待一覧
+- `POST /api/invitations/accept` - 招待を承諾
+- `DELETE /api/invitations/:id` - 招待を取り消し
+
+### API Key Management
+- `GET /api/api-keys` - APIキー一覧取得
+- `POST /api/api-keys` - 新規APIキー作成
+- `DELETE /api/api-keys/:id` - APIキー失効
+
 ### Authentication
 - `POST /api/auth/signup` - 新規ユーザー登録
 - NextAuth endpoints: `/api/auth/*`
@@ -234,6 +326,8 @@ npm run db:reset     # DBをリセット（全データ削除）
 - `POST /api/stripe/checkout` - Checkout Session作成
 - `POST /api/stripe/portal` - Customer Portal Session作成
 - `POST /api/webhooks/stripe` - Stripe Webhook受信
+
+### レスポンス形式
 
 すべてのAPIレスポンスは以下の形式で統一されています:
 
@@ -257,6 +351,17 @@ npm run db:reset     # DBをリセット（全データ削除）
 }
 ```
 
+**権限エラー:**
+```json
+{
+  "success": false,
+  "error": {
+    "message": "この操作を実行する権限がありません",
+    "code": "FORBIDDEN"
+  }
+}
+```
+
 ## Testing（テスト）
 
 ### ユニットテストの実行
@@ -276,48 +381,103 @@ npm run test:ui
 ```
 
 ### テスト対象
+
+#### ライブラリ・ユーティリティ
 - `src/lib/__tests__/validations.test.ts` - バリデーションロジック
 - `src/lib/__tests__/api-response.test.ts` - APIレスポンス処理
+- `src/lib/__tests__/logger.test.ts` - ロギング機能
+- `src/lib/__tests__/metrics.test.ts` - メトリクス収集
+- `src/lib/events/__tests__/bus.test.ts` - イベントバス
+
+#### サービス層
+- `src/services/__tests__/organization.service.test.ts` - 組織管理ロジック
+- `src/services/__tests__/invitation.service.test.ts` - 招待システム
+- `src/services/__tests__/api-key.service.test.ts` - APIキー管理
+
+**テストカバレッジ:**
+- ビジネスロジック
+- バリデーション
+- エラーハンドリング
+- 権限チェック
+- 非同期処理
 
 ## Project Structure（プロジェクト構造）
 
 ```
 saas-nextjs-starter-jp/
+├── docs/
+│   └── PHASE3_OVERVIEW.md      # 🚀 Phase 3実装計画
 ├── prisma/
-│   ├── schema.prisma          # データベーススキーマ
-│   └── seed.ts                # Seedスクリプト
+│   ├── schema.prisma           # データベーススキーマ（拡張）
+│   └── seed.ts                 # 🚀 リッチなSeedデータ
 ├── src/
 │   ├── app/
-│   │   ├── (authenticated)/   # 認証必須ページ
+│   │   ├── (authenticated)/
 │   │   │   ├── dashboard/
 │   │   │   ├── billing/
-│   │   │   └── settings/      # ✨ 実装済み垂直スライス
+│   │   │   ├── settings/
+│   │   │   │   ├── page.tsx           # プロフィール設定
+│   │   │   │   └── api-keys/          # 🚀 APIキー管理
+│   │   │   └── organizations/         # 🚀 組織管理
+│   │   │       ├── page.tsx           # 組織一覧
+│   │   │       ├── new/               # 新規作成
+│   │   │       └── [id]/              # 組織詳細
 │   │   ├── api/
 │   │   │   ├── auth/
-│   │   │   ├── users/         # ✨ User管理API
+│   │   │   ├── users/
+│   │   │   ├── organizations/         # 🚀 組織API
+│   │   │   │   └── [id]/
+│   │   │   │       ├── members/       # メンバー管理
+│   │   │   │       └── invitations/   # 招待管理
+│   │   │   ├── invitations/           # 🚀 招待API
+│   │   │   ├── api-keys/              # 🚀 APIキーAPI
 │   │   │   ├── stripe/
 │   │   │   └── webhooks/
-│   │   ├── auth/              # 認証ページ
-│   │   └── ...
+│   │   └── auth/
 │   ├── components/
-│   │   ├── ui/                # shadcn/ui コンポーネント
-│   │   └── nav.tsx
+│   │   ├── ui/
+│   │   └── nav.tsx                     # 🚀 組織リンク追加
 │   ├── lib/
-│   │   ├── __tests__/         # ✨ ユニットテスト
-│   │   ├── validations/       # ✨ Zodスキーマ
-│   │   ├── api-response.ts    # ✨ 統一されたAPI応答
+│   │   ├── __tests__/                  # 🚀 拡充されたテスト
+│   │   │   ├── validations.test.ts
+│   │   │   ├── api-response.test.ts
+│   │   │   ├── logger.test.ts
+│   │   │   └── metrics.test.ts
+│   │   ├── adapters/                   # 🚀 プラガブル拡張ポイント
+│   │   │   ├── email.ts               # メールアダプター
+│   │   │   ├── storage.ts             # ストレージアダプター
+│   │   │   └── analytics.ts           # 分析アダプター
+│   │   ├── events/                     # 🚀 イベント駆動
+│   │   │   ├── types.ts               # ドメインイベント定義
+│   │   │   ├── bus.ts                 # イベントバス
+│   │   │   └── __tests__/
+│   │   ├── validations/
+│   │   │   ├── user.ts
+│   │   │   ├── organization.ts        # 🚀 組織バリデーション
+│   │   │   └── api-key.ts             # 🚀 APIキーバリデーション
+│   │   ├── api-response.ts
+│   │   ├── logger.ts                   # 🚀 構造化ロギング
+│   │   ├── metrics.ts                  # 🚀 メトリクス収集
 │   │   ├── auth.ts
 │   │   ├── prisma.ts
 │   │   └── stripe.ts
+│   ├── services/                       # 🚀 ビジネスロジック層
+│   │   ├── __tests__/
+│   │   │   ├── organization.service.test.ts
+│   │   │   ├── invitation.service.test.ts
+│   │   │   └── api-key.service.test.ts
+│   │   ├── organization.service.ts
+│   │   ├── invitation.service.ts
+│   │   └── api-key.service.ts
 │   └── hooks/
-├── Dockerfile                  # ✨ プロダクションビルド
-├── docker-compose.yml          # ✨ 本番環境用
-├── docker-compose.dev.yml      # ✨ 開発環境用
-├── vitest.config.ts            # ✨ テスト設定
+├── Dockerfile
+├── docker-compose.yml
+├── docker-compose.dev.yml
+├── vitest.config.ts
 └── README.md
 ```
 
-✨ = Phase 2で追加/強化された部分
+🚀 = Phase 3で追加/強化された部分
 
 ## Environment Variables（環境変数）
 
@@ -340,6 +500,40 @@ NEXT_PUBLIC_STRIPE_PRO_PRICE_ID="price_..."
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
 ```
 
+## Architecture Highlights（アーキテクチャのハイライト）
+
+### 拡張可能な設計
+
+#### Adapter Pattern（アダプターパターン）
+外部サービスとの統合を簡単に切り替え可能:
+- **Email**: Stub → Resend / SendGrid / AWS SES
+- **Storage**: In-Memory → AWS S3 / GCS / Azure Blob
+- **Analytics**: Stub → PostHog / Mixpanel / Amplitude
+
+#### Event-Driven Architecture（イベント駆動）
+- 20種類以上の型付きドメインイベント
+- デカップリングされたイベントハンドラー
+- 将来的にメッセージキュー（Redis, RabbitMQ）への拡張が容易
+
+#### Observability（可観測性）
+- **Logging**: 構造化ログ、コンテキスト伝播
+- **Metrics**: カウンター、ゲージ、タイミング測定
+- **Audit Logs**: 全アクションの追跡
+
+### セキュリティ
+
+- **Role-Based Access Control**: 階層的な権限管理
+- **API Key Hashing**: SHA-256ハッシュ化
+- **Soft Delete**: データ保持とリカバリー
+- **Audit Trail**: 完全な操作履歴
+
+### Code Quality（コード品質）
+
+- **Type Safety**: Prisma + Zod + TypeScript
+- **Testing**: 包括的なユニットテスト
+- **Validation**: すべてのAPI入力を検証
+- **Error Handling**: 統一されたエラーレスポンス
+
 ## Future Extensions（今後の拡張案）
 
 このスターターをベースに以下のような機能を追加できます：
@@ -351,14 +545,16 @@ NEXT_PUBLIC_APP_URL="http://localhost:3000"
 - [ ] 二要素認証（2FA）
 
 ### ユーザー管理
-- [ ] プロフィール画像アップロード
-- [ ] アカウント削除機能
+- [ ] プロフィール画像アップロード（Storageアダプター使用）
+- [ ] アカウント削除機能（完全削除）
 - [ ] メール通知設定
 
-### チーム/組織機能
-- [ ] マルチテナント対応
-- [ ] チーム招待機能
-- [ ] ロールベースアクセス制御（RBAC）
+### 組織機能拡張
+- [x] マルチテナント対応（✅ 実装済み）
+- [x] チーム招待機能（✅ 実装済み）
+- [x] ロールベースアクセス制御（✅ 実装済み）
+- [ ] 組織間のリソース共有
+- [ ] サブ組織/階層構造
 
 ### 課金機能拡張
 - [ ] 年間プラン追加
@@ -367,16 +563,23 @@ NEXT_PUBLIC_APP_URL="http://localhost:3000"
 - [ ] 請求書PDF生成
 
 ### 管理機能
-- [ ] 管理者ダッシュボード
-- [ ] ユーザー管理画面
-- [ ] アクティビティログ
-- [ ] メトリクス・分析
+- [ ] 管理者ダッシュボード（全組織管理）
+- [ ] ユーザー管理画面（検索、フィルタ）
+- [x] アクティビティログ（✅ 監査ログ実装済み）
+- [x] メトリクス・分析基盤（✅ メトリクス実装済み）
 
 ### 開発者体験
+- [x] ユニットテスト（✅ Vitest実装済み）
 - [ ] E2Eテスト（Playwright）
 - [ ] Storybookによるコンポーネントカタログ
-- [ ] CI/CDパイプライン
-- [ ] API ドキュメント自動生成
+- [ ] CI/CDパイプライン（GitHub Actions）
+- [ ] API ドキュメント自動生成（OpenAPI/Swagger）
+
+### 統合
+- [ ] Emailアダプター実装（ResendなどのEmailアダプター実装、Stub→本番切替）
+- [ ] Storageアダプター実装（S3などのStorageアダプター実装、ファイルアップロード機能）
+- [ ] Analyticsアダプター実装（PostHogなどのAnalytics統合、イベントトラッキング）
+- [ ] Webhooks出力（外部システムへのイベント通知）
 
 ## Deployment（デプロイ）
 
@@ -454,7 +657,21 @@ MIT
 
 ---
 
-**🚀 Phase 2 完了 - 本番レベルのスターターテンプレート**
+**🎉 Phase 3 完了 - エンタープライズグレードのSaaSスターター**
 
-このリポジトリは、実際のSaaSプロダクト開発の土台として使用できます。
-エンドツーエンドで動作する実装、テスト、Docker環境、Seedデータがすべて揃っています。
+このリポジトリは、実際のエンタープライズSaaSプロダクトの開発基盤として使用できます。
+
+**実装済み機能:**
+- ✅ マルチテナント（組織管理）
+- ✅ ロールベースアクセス制御（RBAC）
+- ✅ 招待システム（メールベース）
+- ✅ APIキー管理（プログラマティックアクセス）
+- ✅ 監査ログ（セキュリティトラッキング）
+- ✅ 構造化ロギング＆メトリクス
+- ✅ イベント駆動アーキテクチャ
+- ✅ プラガブルアダプター（Email, Storage, Analytics）
+- ✅ 包括的なテストスイート
+- ✅ リッチなシードデータ
+- ✅ Docker環境完備
+
+**詳細:** `docs/PHASE3_OVERVIEW.md` を参照してください。
