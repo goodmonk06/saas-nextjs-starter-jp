@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { signOut, useSession } from "next-auth/react"
-import { LayoutDashboard, CreditCard, Settings, LogOut, User } from "lucide-react"
+import { LayoutDashboard, CreditCard, Settings, LogOut, User, Building2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
@@ -18,6 +18,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 
 const navigation = [
   { name: "ダッシュボード", href: "/dashboard", icon: LayoutDashboard },
+  { name: "組織", href: "/organizations", icon: Building2 },
   { name: "課金", href: "/billing", icon: CreditCard },
   { name: "設定", href: "/settings", icon: Settings },
 ]
@@ -47,12 +48,13 @@ export function Nav() {
             <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
               {navigation.map((item) => {
                 const Icon = item.icon
+                const isActive = pathname === item.href || pathname?.startsWith(item.href + "/")
                 return (
                   <Link
                     key={item.name}
                     href={item.href}
                     className={cn(
-                      pathname === item.href
+                      isActive
                         ? "border-primary text-foreground"
                         : "border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300",
                       "inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"

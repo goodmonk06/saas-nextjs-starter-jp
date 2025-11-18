@@ -133,6 +133,23 @@ export default function SettingsPage() {
       </div>
 
       <Card>
+        <CardHeader>
+          <CardTitle>その他の設定</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            <Button
+              variant="outline"
+              className="w-full justify-start"
+              onClick={() => window.location.href = "/settings/api-keys"}
+            >
+              APIキー管理
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
         <form onSubmit={handleSubmit}>
           <CardHeader>
             <CardTitle>プロフィール編集</CardTitle>
