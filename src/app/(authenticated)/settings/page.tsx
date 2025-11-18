@@ -1,13 +1,126 @@
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
-import { redirect } from "next/navigation"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+"use client"
 
-export default async function SettingsPage() {
-  const session = await getServerSession(authOptions)
+import { useState, useEffect } from "react"
+import { useSession } from "next-auth/react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { useToast } from "@/hooks/use-toast"
 
-  if (!session) {
-    redirect("/auth/signin")
+type UserProfile = {
+  id: string
+  name: string | null
+  email: string
+  plan: string
+  createdAt: string
+  updatedAt: string
+}
+
+export default function SettingsPage() {
+  const { data: session, update: updateSession } = useSession()
+  const { toast } = useToast()
+  const [isLoading, setIsLoading] = useState(false)
+  const [isFetching, setIsFetching] = useState(true)
+  const [profile, setProfile] = useState<UserProfile | null>(null)
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+  })
+
+  // Fetch user profile
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const response = await fetch("/api/users/me")
+        const result = await response.json()
+
+        if (result.success) {
+          setProfile(result.data)
+          setFormData({
+            name: result.data.name || "",
+            email: result.data.email || "",
+          })
+        } else {
+          toast({
+            title: "エラー",
+            description: result.error.message,
+            variant: "destructive",
+          })
+        }
+      } catch (error) {
+        toast({
+          title: "エラー",
+          description: "プロフィールの取得に失敗しました",
+          variant: "destructive",
+        })
+      } finally {
+        setIsFetching(false)
+      }
+    }
+
+    if (session?.user) {
+      fetchProfile()
+    }
+  }, [session, toast])
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsLoading(true)
+
+    try {
+      const response = await fetch("/api/users/me", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        setProfile(result.data)
+
+        // Update NextAuth session
+        await updateSession({
+          ...session,
+          user: {
+            ...session?.user,
+            name: result.data.name,
+            email: result.data.email,
+          },
+        })
+
+        toast({
+          title: "保存完了",
+          description: "プロフィールを更新しました",
+        })
+      } else {
+        toast({
+          title: "エラー",
+          description: result.error.message,
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "エラー",
+        description: "プロフィールの更新に失敗しました",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  if (isFetching) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold">設定</h1>
+          <p className="text-muted-foreground">読み込み中...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -20,73 +133,97 @@ export default async function SettingsPage() {
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>プロフィール情報</CardTitle>
-          <CardDescription>登録されている情報</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <label className="text-sm font-medium">名前</label>
-            <p className="text-sm text-muted-foreground mt-1">
-              {session.user?.name}
-            </p>
-          </div>
-          <div>
-            <label className="text-sm font-medium">メールアドレス</label>
-            <p className="text-sm text-muted-foreground mt-1">
-              {session.user?.email}
-            </p>
-          </div>
-          <div>
-            <label className="text-sm font-medium">プラン</label>
-            <p className="text-sm text-muted-foreground mt-1">
-              {session.user?.plan === "PRO" ? "Pro" : "Free"}
-            </p>
-          </div>
-        </CardContent>
+        <form onSubmit={handleSubmit}>
+          <CardHeader>
+            <CardTitle>プロフィール編集</CardTitle>
+            <CardDescription>
+              あなたの基本情報を編集できます
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">名前</Label>
+              <Input
+                id="name"
+                type="text"
+                value={formData.name}
+                onChange={(e) =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
+                placeholder="山田 太郎"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email">メールアドレス</Label>
+              <Input
+                id="email"
+                type="email"
+                value={formData.email}
+                onChange={(e) =>
+                  setFormData({ ...formData, email: e.target.value })
+                }
+                placeholder="you@example.com"
+              />
+              <p className="text-xs text-muted-foreground">
+                メールアドレスを変更すると、次回ログイン時に新しいアドレスを使用する必要があります
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label>プラン</Label>
+              <p className="text-sm text-muted-foreground">
+                {profile?.plan === "PRO" ? "Pro" : "Free"}
+              </p>
+            </div>
+          </CardContent>
+          <CardFooter className="flex justify-between">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setFormData({
+                  name: profile?.name || "",
+                  email: profile?.email || "",
+                })
+              }}
+              disabled={isLoading}
+            >
+              リセット
+            </Button>
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? "保存中..." : "変更を保存"}
+            </Button>
+          </CardFooter>
+        </form>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>アカウント設定</CardTitle>
-          <CardDescription>
-            プロフィールやパスワードの変更はここで行います
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            将来的な機能拡張として、以下の設定項目を追加できます：
-          </p>
-          <ul className="list-disc list-inside mt-2 space-y-1 text-sm text-muted-foreground">
-            <li>プロフィール編集</li>
-            <li>パスワード変更</li>
-            <li>メール通知設定</li>
-            <li>2要素認証</li>
-            <li>アカウント削除</li>
-          </ul>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>開発者向けメモ</CardTitle>
-          <CardDescription>カスタマイズのヒント</CardDescription>
-        </CardHeader>
-        <CardContent className="prose prose-sm max-w-none">
-          <p className="text-sm text-muted-foreground">
-            このページをカスタマイズして、プロフィール編集フォームや
-            その他のアカウント設定を追加してください。
-          </p>
-          <p className="text-sm text-muted-foreground mt-2">
-            関連ファイル:
-          </p>
-          <ul className="list-disc list-inside text-xs text-muted-foreground space-y-1">
-            <li>src/app/(authenticated)/settings/page.tsx</li>
-            <li>prisma/schema.prisma (Userモデル)</li>
-            <li>src/lib/auth.ts (NextAuth設定)</li>
-          </ul>
-        </CardContent>
-      </Card>
+      {profile && (
+        <Card>
+          <CardHeader>
+            <CardTitle>アカウント情報</CardTitle>
+            <CardDescription>システム情報</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div>
+              <p className="text-sm font-medium">アカウントID</p>
+              <p className="text-sm text-muted-foreground font-mono">
+                {profile.id}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm font-medium">作成日</p>
+              <p className="text-sm text-muted-foreground">
+                {new Date(profile.createdAt).toLocaleDateString("ja-JP")}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm font-medium">最終更新日</p>
+              <p className="text-sm text-muted-foreground">
+                {new Date(profile.updatedAt).toLocaleDateString("ja-JP")}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

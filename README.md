@@ -1,298 +1,460 @@
 # SaaS Starter JP
 
-日本向けSaaSの汎用スターター。認証・課金・ユーザー管理・管理画面までをまとめた土台。
+日本向けSaaSの汎用スターター。認証・課金・ユーザー管理・管理画面までを含む、本番環境に近い実装を提供します。
 
-## 技術スタック
+## Overview（概要）
 
-- **Next.js 14** (App Router)
-- **TypeScript**
-- **NextAuth.js** - 認証
-- **Prisma** - ORM
-- **PostgreSQL** - データベース
-- **Stripe** - サブスクリプション課金
-- **Tailwind CSS** + **shadcn/ui** - UI
+このプロジェクトは、日本市場向けのSaaSアプリケーションを素早く立ち上げるための完全なスターターテンプレートです。
 
-## 主な機能
+**Phase 2 ステータス:**
+- ✅ エンドツーエンドで動作する垂直スライス実装済み
+- ✅ ローカル開発環境整備済み（Docker対応）
+- ✅ テスト環境構築済み
+- ✅ Seedデータ準備済み
 
-### 認証
-- メールアドレス＋パスワードでのサインアップ/ログイン
-- NextAuth.jsを使用したセッション管理
-- 認証ミドルウェアによるルート保護
+## Tech Stack（技術スタック）
 
-### サブスクリプション課金
-- **Freeプラン** と **Proプラン** (月額)
-- Stripe Checkoutによる決済フロー
-- Stripe Webhookによる自動プラン更新
-- サブスクリプション管理画面（Stripe Customer Portal）
+### フロントエンド
+- **Next.js 14** (App Router) - React フレームワーク
+- **TypeScript** - 型安全な開発
+- **Tailwind CSS** - ユーティリティファーストCSS
+- **shadcn/ui** - 高品質なUIコンポーネント
 
-### ページ構成
-- `/` - ランディングページ
-- `/auth/signin` - ログイン
-- `/auth/signup` - 新規登録
-- `/dashboard` - ダッシュボード（認証必須）
-- `/billing` - 課金管理（認証必須）
-- `/settings` - アカウント設定（認証必須）
+### バックエンド
+- **NextAuth.js v4** - 認証・セッション管理
+- **Prisma** - タイプセーフなORM
+- **PostgreSQL** - リレーショナルデータベース
+- **Zod** - スキーマバリデーション
 
-## セットアップ
+### 外部サービス
+- **Stripe** - サブスクリプション決済
 
-### 1. 環境変数の設定
+### 開発ツール
+- **Vitest** - 高速なユニットテスト
+- **ESLint** - コード品質チェック
+- **Docker & Docker Compose** - コンテナ化とローカル開発
 
-`.env.example` をコピーして `.env` を作成し、必要な値を設定してください。
+## Domain Model Summary（ドメインモデル）
+
+### 主要エンティティ
+
+#### User（ユーザー）
+- ユーザーアカウント情報
+- 認証情報（email/password）
+- プラン情報（FREE/PRO）
+- Stripe顧客情報
+
+**リレーション:**
+- `accounts` (1:N) - OAuth アカウント連携用
+- `sessions` (1:N) - セッション管理用
+
+#### Subscription（サブスクリプション）
+Userモデルに統合されています:
+- `plan`: FREE | PRO
+- `stripeCustomerId`: Stripe顧客ID
+- `stripeSubscriptionId`: サブスクリプションID
+- `stripeCurrentPeriodEnd`: 課金期間終了日
+
+## Getting Started（セットアップ）
+
+### Requirements（前提条件）
+
+- **Node.js** 20.x 以降
+- **PostgreSQL** 16.x 以降（またはDocker）
+- **npm** または **yarn** または **pnpm**
+
+### Option 1: Docker を使用（推奨）
+
+最も簡単な開始方法です。
 
 ```bash
+# 1. リポジトリをクローン
+git clone https://github.com/yourusername/saas-nextjs-starter-jp.git
+cd saas-nextjs-starter-jp
+
+# 2. 環境変数を設定
 cp .env.example .env
-```
+# .env を編集して NEXTAUTH_SECRET を設定:
+# NEXTAUTH_SECRET=$(openssl rand -base64 32)
 
-必要な環境変数：
-- `DATABASE_URL` - PostgreSQL接続URL
-- `NEXTAUTH_URL` - アプリケーションURL
-- `NEXTAUTH_SECRET` - NextAuthシークレット（`openssl rand -base64 32` で生成）
-- `STRIPE_SECRET_KEY` - StripeシークレットキーSTRIPE_WEBHOOK_SECRET` - Stripe WebhookシークレットNEXT_PUBLIC_STRIPE_PRO_PRICE_ID` - StripeプライスID（Proプラン）
-- `NEXT_PUBLIC_APP_URL` - アプリケーションURL（フロントエンド用）
+# 3. Docker Compose で開発環境を起動（DBのみ）
+docker compose -f docker-compose.dev.yml up -d
 
-### 2. 依存関係のインストール
-
-```bash
+# 4. 依存関係をインストール
 npm install
-# または
-yarn install
-# または
-pnpm install
-```
 
-### 3. データベースのセットアップ
+# 5. データベースマイグレーション
+npm run db:migrate
 
-```bash
-# Prismaマイグレーション実行
-npx prisma migrate dev
+# 6. Seedデータ投入
+npm run db:seed
 
-# Prisma Clientの生成
-npx prisma generate
-```
-
-### 4. Stripeの設定
-
-1. [Stripe Dashboard](https://dashboard.stripe.com/) でアカウントを作成
-2. テスト環境のAPIキーを取得
-3. Productsページで「Pro」プランを作成（月額課金）
-4. プライスIDを `NEXT_PUBLIC_STRIPE_PRO_PRICE_ID` に設定
-5. Webhookエンドポイントを設定: `https://your-domain.com/api/webhooks/stripe`
-   - イベント: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`
-
-### 5. 開発サーバーの起動
-
-```bash
+# 7. 開発サーバー起動
 npm run dev
-# または
-yarn dev
-# または
-pnpm dev
 ```
 
-http://localhost:3000 でアプリケーションが起動します。
+アプリケーションは http://localhost:3000 で起動します。
 
-## プロダクト派生時の注意点
+### Option 2: ローカルPostgreSQLを使用
 
-このスターターから自社プロダクトを派生させる際の重要なポイント：
+```bash
+# 1. リポジトリをクローン
+git clone https://github.com/yourusername/saas-nextjs-starter-jp.git
+cd saas-nextjs-starter-jp
 
-### セキュリティ
+# 2. 環境変数を設定
+cp .env.example .env
+# DATABASE_URL を自分のPostgreSQL接続文字列に変更
+# NEXTAUTH_SECRET を生成して設定
 
-- **環境変数の管理**
-  - `.env` ファイルは絶対にGitにコミットしない
-  - 本番環境では強力な `NEXTAUTH_SECRET` を使用する
-  - Stripeのキーは必ずテスト環境と本番環境を分ける
+# 3. 依存関係をインストール
+npm install
 
-- **認証の強化**
-  - パスワードポリシーの見直し（現在は8文字以上のみ）
-  - メール認証の追加を検討
-  - 2要素認証（2FA）の実装を検討
-  - レート制限の実装（ブルートフォース対策）
+# 4. データベースマイグレーション
+npm run db:migrate
 
-- **CORS設定**
-  - 本番環境では適切なCORS設定を行う
-  - `NEXT_PUBLIC_APP_URL` を本番URLに変更する
+# 5. Seedデータ投入
+npm run db:seed
+
+# 6. 開発サーバー起動
+npm run dev
+```
+
+### Option 3: 完全にDockerで起動
+
+```bash
+# 1. リポジトリをクローン
+git clone https://github.com/yourusername/saas-nextjs-starter-jp.git
+cd saas-nextjs-starter-jp
+
+# 2. 環境変数を設定
+cp .env.example .env
+
+# 3. Docker Compose でビルド＆起動
+docker compose up --build
+```
+
+アプリケーションは http://localhost:3000 で起動します。
+
+## Example Flow（実装された垂直スライス）
+
+### User Profile Management（ユーザープロフィール管理）
+
+完全に動作するエンドツーエンドの機能実装例：
+
+#### 1. ユーザー登録
+1. http://localhost:3000/auth/signup にアクセス
+2. 名前、メール、パスワードを入力
+3. アカウント作成後、自動的にダッシュボードへリダイレクト
+
+#### 2. プロフィール取得
+```bash
+# API経由でプロフィール取得
+curl -X GET http://localhost:3000/api/users/me \
+  -H "Cookie: next-auth.session-token=YOUR_SESSION"
+```
+
+レスポンス例:
+```json
+{
+  "success": true,
+  "data": {
+    "id": "clxxx...",
+    "name": "テストユーザー",
+    "email": "test@example.com",
+    "plan": "FREE",
+    "createdAt": "2025-01-01T00:00:00.000Z",
+    "updatedAt": "2025-01-01T00:00:00.000Z"
+  }
+}
+```
+
+#### 3. プロフィール更新
+1. http://localhost:3000/settings にアクセス
+2. 名前やメールアドレスを変更
+3. 「変更を保存」ボタンをクリック
+4. リアルタイムでUIとセッションが更新される
+
+または API 経由:
+```bash
+curl -X PATCH http://localhost:3000/api/users/me \
+  -H "Content-Type: application/json" \
+  -H "Cookie: next-auth.session-token=YOUR_SESSION" \
+  -d '{"name": "新しい名前"}'
+```
+
+### デモアカウント
+
+Seedスクリプトにより、以下のデモアカウントが作成されます:
+
+| Email | Password | Plan |
+|-------|----------|------|
+| demo-free@example.com | demo1234 | FREE |
+| demo-pro@example.com | demo1234 | PRO |
+
+これらのアカウントでログインして、すぐに機能を試すことができます。
+
+## Available Scripts（利用可能なコマンド）
+
+### 開発
+```bash
+npm run dev          # 開発サーバー起動 (http://localhost:3000)
+npm run build        # プロダクションビルド
+npm run start        # プロダクションサーバー起動
+npm run lint         # ESLintでコードチェック
+```
+
+### テスト
+```bash
+npm test             # Vitestでユニットテスト実行
+npm run test:ui      # Vitest UIモードで実行
+```
 
 ### データベース
+```bash
+npm run db:generate  # Prisma Clientを生成
+npm run db:push      # スキーマをDBに反映（開発用）
+npm run db:migrate   # マイグレーションを作成＆適用
+npm run db:seed      # Seedデータを投入
+npm run db:studio    # Prisma Studioを起動
+npm run db:reset     # DBをリセット（全データ削除）
+```
 
-- **本番データベース**
-  - PostgreSQLの本番環境を用意（Railway、Supabase、AWS RDSなど）
-  - バックアップ戦略を立てる
-  - マイグレーションの管理方法を決める
+## API エンドポイント
 
-- **スキーマのカスタマイズ**
-  - `prisma/schema.prisma` を自社要件に合わせて変更
-  - 必要に応じてモデルを追加（例: Team, Project, Invitationなど）
-  - インデックスを適切に設定してパフォーマンスを最適化
+### User Management
+- `GET /api/users/me` - 現在のユーザー情報取得
+- `PATCH /api/users/me` - ユーザー情報更新
 
-### Stripe課金
+### Authentication
+- `POST /api/auth/signup` - 新規ユーザー登録
+- NextAuth endpoints: `/api/auth/*`
 
-- **プランのカスタマイズ**
-  - 料金、機能、制限を自社プロダクトに合わせて変更
-  - 複数のプラン（Basic, Pro, Enterpriseなど）への対応
-  - 年間プランの追加を検討
+### Stripe
+- `POST /api/stripe/checkout` - Checkout Session作成
+- `POST /api/stripe/portal` - Customer Portal Session作成
+- `POST /api/webhooks/stripe` - Stripe Webhook受信
 
-- **Webhook**
-  - 本番環境では必ずWebhookシークレットを設定する
-  - Webhookの署名検証を必ず行う（実装済み）
-  - リトライ処理とエラーハンドリングを強化
+すべてのAPIレスポンスは以下の形式で統一されています:
 
-- **テスト**
-  - Stripe CLIを使用してローカルでWebhookをテスト
-  - テストモードで十分にテストしてから本番移行
+**成功時:**
+```json
+{
+  "success": true,
+  "data": { ... }
+}
+```
 
-### UI/UX
+**エラー時:**
+```json
+{
+  "success": false,
+  "error": {
+    "message": "エラーメッセージ",
+    "code": "ERROR_CODE",
+    "details": { ... }
+  }
+}
+```
 
-- **ブランディング**
-  - ロゴ、カラースキーム、フォントを変更
-  - `tailwind.config.ts` でテーマカラーをカスタマイズ
-  - OGP画像、ファビコンを設定
+## Testing（テスト）
 
-- **多言語対応**
-  - 必要に応じてi18n（国際化）を実装
-  - next-intlなどのライブラリを検討
+### ユニットテストの実行
 
-- **レスポンシブ対応**
-  - モバイルファーストで設計
-  - 各画面サイズで動作確認
+```bash
+# すべてのテストを実行
+npm test
 
-### 機能拡張
+# ウォッチモードで実行
+npm test -- --watch
 
-- **追加すべき機能の例**
-  - プロフィール編集
-  - パスワードリセット
-  - メール通知機能
-  - チーム/組織管理（マルチテナント化）
-  - 使用量制限（プランごとの機能制限）
-  - アクティビティログ
-  - 管理者ダッシュボード
+# カバレッジレポート生成
+npm test -- --coverage
 
-### パフォーマンス
+# UI モードで実行
+npm run test:ui
+```
 
-- **最適化**
-  - 画像の最適化（Next.js Image コンポーネント活用）
-  - Server Componentsを活用してクライアント側のJSを削減
-  - データベースクエリの最適化
-  - キャッシング戦略の実装
+### テスト対象
+- `src/lib/__tests__/validations.test.ts` - バリデーションロジック
+- `src/lib/__tests__/api-response.test.ts` - APIレスポンス処理
 
-### 監視・ログ
-
-- **エラートラッキング**
-  - Sentry、Bugsnagなどのエラートラッキングツールを導入
-  - ログ収集・分析の仕組みを構築
-
-- **アナリティクス**
-  - Google Analytics、Plausibleなどのアナリティクスツールを導入
-  - ユーザー行動の追跡と分析
-
-### コンプライアンス
-
-- **法的要件**
-  - プライバシーポリシー、利用規約の作成
-  - GDPR、個人情報保護法への対応
-  - 特定商取引法に基づく表記（日本）
-
-- **決済関連**
-  - Stripeの利用規約を確認
-  - 返金ポリシーの策定
-
-### デプロイ
-
-- **推奨プラットフォーム**
-  - Vercel（Next.js最適化済み）
-  - Railway（フルスタック対応）
-  - AWS、GCPなどのクラウドプロバイダー
-
-- **CI/CD**
-  - GitHub Actionsなどで自動デプロイを設定
-  - ステージング環境と本番環境を分ける
-  - デプロイ前のテスト自動化
-
-## ディレクトリ構造
+## Project Structure（プロジェクト構造）
 
 ```
 saas-nextjs-starter-jp/
 ├── prisma/
-│   └── schema.prisma          # データベーススキーマ
+│   ├── schema.prisma          # データベーススキーマ
+│   └── seed.ts                # Seedスクリプト
 ├── src/
 │   ├── app/
 │   │   ├── (authenticated)/   # 認証必須ページ
 │   │   │   ├── dashboard/
 │   │   │   ├── billing/
-│   │   │   └── settings/
+│   │   │   └── settings/      # ✨ 実装済み垂直スライス
 │   │   ├── api/
-│   │   │   ├── auth/          # NextAuth + サインアップ
-│   │   │   ├── stripe/        # Stripe Checkout/Portal
-│   │   │   └── webhooks/      # Stripe Webhook
+│   │   │   ├── auth/
+│   │   │   ├── users/         # ✨ User管理API
+│   │   │   ├── stripe/
+│   │   │   └── webhooks/
 │   │   ├── auth/              # 認証ページ
-│   │   ├── globals.css
-│   │   ├── layout.tsx
-│   │   └── page.tsx
+│   │   └── ...
 │   ├── components/
 │   │   ├── ui/                # shadcn/ui コンポーネント
-│   │   └── nav.tsx            # ナビゲーション
+│   │   └── nav.tsx
 │   ├── lib/
-│   │   ├── auth.ts            # NextAuth設定
-│   │   ├── prisma.ts          # Prismaクライアント
-│   │   ├── stripe.ts          # Stripe設定
-│   │   └── utils.ts           # ユーティリティ
-│   ├── hooks/
-│   │   └── use-toast.ts       # トースト通知
-│   └── types/
-│       └── next-auth.d.ts     # NextAuth型定義
-├── .env.example
-├── .gitignore
-├── middleware.ts              # 認証ミドルウェア
-├── next.config.js
-├── package.json
-├── tailwind.config.ts
-└── tsconfig.json
+│   │   ├── __tests__/         # ✨ ユニットテスト
+│   │   ├── validations/       # ✨ Zodスキーマ
+│   │   ├── api-response.ts    # ✨ 統一されたAPI応答
+│   │   ├── auth.ts
+│   │   ├── prisma.ts
+│   │   └── stripe.ts
+│   └── hooks/
+├── Dockerfile                  # ✨ プロダクションビルド
+├── docker-compose.yml          # ✨ 本番環境用
+├── docker-compose.dev.yml      # ✨ 開発環境用
+├── vitest.config.ts            # ✨ テスト設定
+└── README.md
 ```
 
-## よくある質問
+✨ = Phase 2で追加/強化された部分
 
-### Q: データベースをMySQLに変更できますか？
-A: はい。`prisma/schema.prisma` の `datasource db` を変更し、`DATABASE_URL` を更新してください。
+## Environment Variables（環境変数）
 
-### Q: Stripeの代わりに別の決済サービスを使えますか？
-A: 可能です。`src/lib/stripe.ts` と関連APIルートを置き換える必要があります。
+`.env.example`を参照してください。主要な環境変数:
 
-### Q: NextAuth以外の認証ライブラリを使いたいです
-A: Clerk、Auth0、Supabase Authなどに置き換え可能です。認証ロジックを書き換えてください。
+```bash
+# Database
+DATABASE_URL="postgresql://user:password@localhost:5432/db_name"
 
-### Q: マルチテナント（チーム機能）を追加したいです
-A: Prismaスキーマに `Team` モデルを追加し、ユーザーとチームの関連を定義してください。
+# NextAuth
+NEXTAUTH_URL="http://localhost:3000"
+NEXTAUTH_SECRET="your-secret-here"  # openssl rand -base64 32
 
-## トラブルシューティング
+# Stripe (Optional - 課金機能を使う場合)
+STRIPE_SECRET_KEY="sk_test_..."
+STRIPE_WEBHOOK_SECRET="whsec_..."
+NEXT_PUBLIC_STRIPE_PRO_PRICE_ID="price_..."
+
+# App
+NEXT_PUBLIC_APP_URL="http://localhost:3000"
+```
+
+## Future Extensions（今後の拡張案）
+
+このスターターをベースに以下のような機能を追加できます：
+
+### 認証関連
+- [ ] メール認証（メールアドレス確認）
+- [ ] パスワードリセット機能
+- [ ] OAuth プロバイダー追加（Google、GitHub等）
+- [ ] 二要素認証（2FA）
+
+### ユーザー管理
+- [ ] プロフィール画像アップロード
+- [ ] アカウント削除機能
+- [ ] メール通知設定
+
+### チーム/組織機能
+- [ ] マルチテナント対応
+- [ ] チーム招待機能
+- [ ] ロールベースアクセス制御（RBAC）
+
+### 課金機能拡張
+- [ ] 年間プラン追加
+- [ ] 使用量ベース課金
+- [ ] クーポン/プロモーションコード
+- [ ] 請求書PDF生成
+
+### 管理機能
+- [ ] 管理者ダッシュボード
+- [ ] ユーザー管理画面
+- [ ] アクティビティログ
+- [ ] メトリクス・分析
+
+### 開発者体験
+- [ ] E2Eテスト（Playwright）
+- [ ] Storybookによるコンポーネントカタログ
+- [ ] CI/CDパイプライン
+- [ ] API ドキュメント自動生成
+
+## Deployment（デプロイ）
+
+### Vercel（推奨）
+
+```bash
+# Vercel CLIをインストール
+npm i -g vercel
+
+# デプロイ
+vercel
+
+# 環境変数を設定
+# Vercel Dashboard > Settings > Environment Variables
+```
+
+### Railway
+
+```bash
+# Railway CLIをインストール
+npm i -g @railway/cli
+
+# ログイン
+railway login
+
+# プロジェクト初期化
+railway init
+
+# デプロイ
+railway up
+```
+
+### Docker（任意のクラウド）
+
+```bash
+# イメージをビルド
+docker build -t saas-starter .
+
+# コンテナを実行
+docker run -p 3000:3000 --env-file .env saas-starter
+```
+
+## Troubleshooting（トラブルシューティング）
+
+### データベース接続エラー
+```bash
+# Docker Composeでデータベースが起動しているか確認
+docker compose -f docker-compose.dev.yml ps
+
+# データベースログを確認
+docker compose -f docker-compose.dev.yml logs db
+```
 
 ### Prismaマイグレーションエラー
 ```bash
 # マイグレーションをリセット
-npx prisma migrate reset
+npm run db:reset
 
 # 再度マイグレーション実行
-npx prisma migrate dev
+npm run db:migrate
 ```
 
 ### NextAuth セッションエラー
 - `NEXTAUTH_SECRET` が設定されているか確認
-- `NEXTAUTH_URL` が正しいか確認
+- `NEXTAUTH_URL` が正しいURLになっているか確認
+- ブラウザのクッキーをクリア
 
-### Stripe Webhookが動作しない
-- Webhookシークレットが正しいか確認
-- ローカル開発では Stripe CLI を使用
+## Contributing（貢献）
 
-## 参考リンク
+プルリクエストを歓迎します。大きな変更の場合は、まずissueを開いて変更内容を議論してください。
 
-- [Next.js Documentation](https://nextjs.org/docs)
-- [NextAuth.js Documentation](https://next-auth.js.org/)
-- [Prisma Documentation](https://www.prisma.io/docs)
-- [Stripe Documentation](https://stripe.com/docs)
-- [shadcn/ui Documentation](https://ui.shadcn.com/)
-
-## ライセンス
+## License
 
 MIT
 
 ---
 
-このスターターをベースに、素晴らしいSaaSプロダクトを作ってください！
+**🚀 Phase 2 完了 - 本番レベルのスターターテンプレート**
+
+このリポジトリは、実際のSaaSプロダクト開発の土台として使用できます。
+エンドツーエンドで動作する実装、テスト、Docker環境、Seedデータがすべて揃っています。
